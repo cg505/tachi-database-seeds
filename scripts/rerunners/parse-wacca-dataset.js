@@ -66,9 +66,12 @@ const STARTS = {
 };
 
 (async () => {
-	const existingSongs = new Map(ReadCollection("songs-wacca.json").map((e) => [e.title, e.id]));
+	const songs = ReadCollection("songs-wacca.json");
+	const charts = ReadCollection("charts-wacca.json");
+
+	const existingSongs = new Map(songs.map((e) => [e.title, e.id]));
 	const existingCharts = new Map(
-		ReadCollection("charts-wacca.json").map((e) =>
+		charts.map((e) =>
 			// We need to combine songID and difficulty for the key,
 			// this seems like the simplest way.
 			[`${e.songID} ${e.difficulty}`, e.chartID]
@@ -82,9 +85,6 @@ const STARTS = {
 		},
 		body: "cat=all",
 	}).then((r) => r.json());
-
-	const songs = [];
-	const charts = [];
 
 	let songID = Math.max(...existingSongs.values()) + 1;
 
@@ -142,24 +142,27 @@ const STARTS = {
 			thisSongID = existingSongs.get(title);
 		} else {
 			songID++;
+			songs.push({
+				id: thisSongID,
+				title,
+				artist: decode(data.artist.display).trim(),
+				searchTerms,
+				altTitles,
+				data: {
+					titleJP: decode(data.title.ruby),
+					artistJP: decode(data.artist.ruby),
+					genre: decode(data.category),
+					displayVersion: ver,
+				},
+			});
 		}
-		songs.push({
-			id: thisSongID,
-			title,
-			artist: decode(data.artist.display).trim(),
-			searchTerms,
-			altTitles,
-			data: {
-				titleJP: decode(data.title.ruby),
-				artistJP: decode(data.artist.ruby),
-				genre: decode(data.category),
-				displayVersion: ver,
-			},
-		});
 
 		for (const cols of difficultyCols) {
 			const diff = record[cols.levelCol];
 			const [diffName, level] = diff.split(" ");
+			if (existingCharts.get(`${thisSongID} ${diffName}`)) {
+				continue;
+			}
 			const levelNum = Number(record[cols.constantCol]);
 			const isHot = record[cols.newerCol] === "true";
 
@@ -167,7 +170,7 @@ const STARTS = {
 				continue;
 			}
 
-			const chartID = existingCharts.get(`${thisSongID} ${diffName}`) || CreateChartID();
+			const chartID = CreateChartID();
 
 			charts.push({
 				songID: thisSongID,
